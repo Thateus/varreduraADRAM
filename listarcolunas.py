@@ -1,15 +1,13 @@
 import duckdb
 
 con = duckdb.connect()
-con.execute("INSTALL spatial")
 con.execute("LOAD spatial")
 
-caminho = r"D:\pcp.faxinal\Documentos\py\BOLETIM DIARIO 31.xlsx"
+caminho = r"\\ARAGORN\Fabrica\PCP - Planejamento e Controle de Produção\BOLETIM DIARIO - MATHEUS\BOLETIM 2026\MARÇO\BOLETIM DIARIO 31.xlsx"
 
 query = """
 SELECT *
-FROM st_read(?, layer='RESUMO DIARIO')
-LIMIT 6 OFFSET 11
+FROM st_read(?, layer='Produção Diária')
 """
 
 dados = con.execute(query, [caminho]).fetchall()
@@ -20,15 +18,36 @@ def limpar(valor):
     except:
         return 0.0
 
+COL_CODIGO = 1
+COL_DESCRICAO = 2
+COL_VALOR = 3
+
 chaves = ["011", "201", "204", "207", "208", "209"]
 
-valores = {k: limpar(dados[i][18]) for i, k in enumerate(chaves)}
+valores = {k: {"total": 0, "nome": ""} for k in chaves}
 
-total = sum(valores.values())
+for linha in dados:
+	codigo = str(linha[COL_CODIGO]).strip()
 
-print("\n===RESUMO DIARIO===\n")
-for k, v in valores.items():
-	status = "OK" if v > 0 else "ZERO"
-	print(f"Produto COD. {k}: {v:.0f} [{status}]")
+	if not codigo.isdigit():
+		continue
 
-print(f"\nTOTAL: {total:.0f}")
+	if codigo in valores:
+		valores[codigo]["total"] += limpar(linha[COL_VALOR])
+
+		nome = str(linha[COL_DESCRICAO]).strip() 
+		if nome:
+			valores[codigo]["nome"] = nome
+
+total_geral = sum(v["total"] for v in valores.values())
+
+print("\n=== PRODUÇÃO MENSAL===\n")
+
+for k, info in valores.items():
+	nome = info["nome"] or "SEM NOME"
+	total = int(info["total"])
+	status = "OK" if total > 0 else "ZERO"
+
+	print(f"{nome} ({k}): {total} [{status}]")
+
+print(f"\nTOTAL: {total_geral:.0f}\n\n")
